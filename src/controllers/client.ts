@@ -1,9 +1,8 @@
 import { Request, Response } from 'express'
 import Client from 'models/client'
 import MyRequest from 'types/myreq'
-import cron from 'node-cron'
+import scheduler from 'node-schedule'
 import sendEmail from 'services/email'
-import { format } from 'date-fns'
 
 export const createClient = async (req: Request, res: Response) => {
     try {
@@ -30,8 +29,7 @@ export const getClientsForCoach = async (req: Request, res: Response) => {
         const { coachId } = req.params
         const clients = await Client.find({ coachId })
         res.status(200).json({ clients })
-    } catch (e) {
-        console.log(e)
+    } catch {
         res.status(500).json({ message: 'Error retrieving clients' })
     }
 }
@@ -99,9 +97,9 @@ export const scheduleSession = async (req: MyRequest, res: Response) => {
                 if (sessionType === 'Follow-up') {
                     const reminderTime = new Date(dateTime)
                     reminderTime.setHours(reminderTime.getHours() - 24)
-                    const cronTime = format(reminderTime, 'm H d M *')
                     // Schedule the cron job
-                    const job = cron.schedule(cronTime, async () => {
+                    scheduler.scheduleJob(reminderTime, async () => {
+                        if (reminderTime.getTime() > Date.now()) return
                         const client = await Client.findById(id)
                         if (!client || !client.email) return
 
@@ -115,8 +113,6 @@ export const scheduleSession = async (req: MyRequest, res: Response) => {
                                     'something went wrong while sending email 📨 👎'
                                 )
                         )
-
-                        job.stop()
                     })
                 }
                 sendEmail(
